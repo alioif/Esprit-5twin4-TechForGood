@@ -2,7 +2,7 @@
 
 # TexTileCycle
 
-**La seconde vie du textile devient visible.**
+**La seconde vie du textile devient visible**
 
 Plateforme de circularité textile, de passeports numériques et de préparation aux labels.
 
