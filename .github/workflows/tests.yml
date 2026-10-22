@@ -1,31 +1,67 @@
-name: Application tests
+
+name: TextileCycle - CI/CD Pipeline
 
 on:
-  workflow_dispatch:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
+
 jobs:
-  test:
+  ci:
+    name: CI - Build & Tests
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: mbstring, pdo_sqlite, bcmath
           coverage: none
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
-      - run: composer install --no-interaction --prefer-dist
-      - run: cp .env.example .env
-      - run: php artisan key:generate
-      - run: npm ci
-      - run: npm run build
-      - name: Run migrations and tests
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Configure Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run Laravel tests
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
         run: php artisan test
+
+  cd:
+    name: CD - Deploy to Render
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render deployment
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          test -n "$RENDER_HOOK"
+          curl --fail --show-error --silent \
+            --retry 3 \
+            --request POST "$RENDER_HOOK"
+          echo "Render deployment triggered"
