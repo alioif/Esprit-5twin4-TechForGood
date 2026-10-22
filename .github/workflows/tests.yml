@@ -7,21 +7,28 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     name: CI - Build & Tests
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: mbstring, pdo_sqlite, bcmath
-          coverage: none
+          coverage: xdebug
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,11 +50,16 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Run Laravel tests
+      - name: Run Laravel tests with coverage
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
-        run: php artisan test
+          XDEBUG_MODE: coverage
+        run: vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=junit.xml
+
+      - name: Upload coverage to SonarCloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v6
 
   cd:
     name: CD - Deploy to Render
